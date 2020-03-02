@@ -78,7 +78,7 @@ at::Tensor box_iou_rotated_cuda(
 
   bool transpose = false;
   if (num_boxes1 > 0 && num_boxes2 > 0) {
-    scalar_t *data1 = boxes1.data_ptr<scalar_t>(),
+    const scalar_t *data1 = boxes1.data_ptr<scalar_t>(),
              *data2 = boxes2.data_ptr<scalar_t>();
 
     if (num_boxes2 > 65535 * BLOCK_DIM_Y) {
