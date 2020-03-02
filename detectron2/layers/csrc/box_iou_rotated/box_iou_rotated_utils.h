@@ -4,7 +4,7 @@
 #include <cassert>
 #include <cmath>
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) ||  __HIP_DEVICE_COMPILE__==1
 // Designates functions callable from the host (CPU) and the device (GPU)
 #define HOST_DEVICE __host__ __device__
 #define HOST_DEVICE_INLINE HOST_DEVICE __forceinline__
@@ -194,7 +194,7 @@ HOST_DEVICE_INLINE int convex_hull_graham(
     dist[i] = dot_2d<T>(q[i], q[i]);
   }
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) ||  __HIP_DEVICE_COMPILE__==1
   // CUDA version
   // In the future, we can potentially use thrust
   // for sorting here to improve speed (though not guaranteed)

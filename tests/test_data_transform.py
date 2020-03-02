@@ -78,3 +78,6 @@ class TestTransforms(unittest.TestCase):
 
         t = T.RandomFlip()
         self.assertTrue(str(t) == "RandomFlip()")
+
+if __name__ == "__main__":
+    unittest.main()

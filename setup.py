@@ -8,7 +8,8 @@ from os import path
 from setuptools import find_packages, setup
 from typing import List
 import torch
-from torch.utils.cpp_extension import CUDA_HOME, CppExtension, CUDAExtension
+from torch.utils.cpp_extension import CUDA_HOME, ROCM_HOME, CppExtension, CUDAExtension
+from torch.utils.hipify import hipify_python
 
 torch_ver = [int(x) for x in torch.__version__.split(".")[:2]]
 assert torch_ver >= [1, 3], "Requires PyTorch >= 1.3"
@@ -42,9 +43,36 @@ def get_extensions():
 
     main_source = path.join(extensions_dir, "vision.cpp")
     sources = glob.glob(path.join(extensions_dir, "**", "*.cpp"))
-    source_cuda = glob.glob(path.join(extensions_dir, "**", "*.cu")) + glob.glob(
-        path.join(extensions_dir, "*.cu")
-    )
+
+    is_rocm_pytorch = os.path.exists(ROCM_HOME)
+
+    if is_rocm_pytorch:
+        print("ROCM!")
+        hipify_python.hipify(
+            project_directory=this_dir,
+            output_directory=this_dir,
+            includes="/detectron2/layers/csrc/*",
+            show_detailed=True,
+            is_pytorch_extension=True)
+
+
+        source_cuda = glob.glob(path.join(extensions_dir, "**", 'hip', "*.hip")) + glob.glob(
+            path.join(extensions_dir, 'hip', "*.hip"))
+
+        print("source_cuda:", source_cuda)
+        shutil.copy("detectron2/layers/csrc/box_iou_rotated/box_iou_rotated_utils.h", 
+                    "detectron2/layers/csrc/box_iou_rotated/hip/box_iou_rotated_utils.h")
+        shutil.copy("detectron2/layers/csrc/deformable/deform_conv.h", 
+                    "detectron2/layers/csrc/deformable/hip/deform_conv.h")
+
+    else:
+        source_cuda = glob.glob(path.join(extensions_dir, "**", "*.cu")) + glob.glob(
+            path.join(extensions_dir, "*.cu"))
+
+    source_real_cuda = glob.glob(path.join(extensions_dir, "**", "*.cu")) + glob.glob(
+            path.join(extensions_dir, "*.cu"))
+
+    print("Original cuda source: ", source_real_cuda)
 
     sources = [main_source] + sources
     extension = CppExtension
@@ -55,13 +83,18 @@ def get_extensions():
     if (torch.cuda.is_available() and CUDA_HOME is not None) or os.getenv("FORCE_CUDA", "0") == "1":
         extension = CUDAExtension
         sources += source_cuda
-        define_macros += [("WITH_CUDA", None)]
-        extra_compile_args["nvcc"] = [
-            "-DCUDA_HAS_FP16=1",
-            "-D__CUDA_NO_HALF_OPERATORS__",
-            "-D__CUDA_NO_HALF_CONVERSIONS__",
-            "-D__CUDA_NO_HALF2_OPERATORS__",
-        ]
+
+        if not is_rocm_pytorch:
+            define_macros += [("WITH_CUDA", None)]
+            extra_compile_args["nvcc"] = [
+                "-DCUDA_HAS_FP16=1",
+                "-D__CUDA_NO_HALF_OPERATORS__",
+                "-D__CUDA_NO_HALF_CONVERSIONS__",
+                "-D__CUDA_NO_HALF2_OPERATORS__",
+            ]
+        else:
+            define_macros += [("WITH_HIP", None)]
+            extra_compile_args["nvcc"] = []
 
         # It's better if pytorch can do this by default ..
         CC = os.environ.get("CC", None)

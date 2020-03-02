@@ -9,7 +9,7 @@
 
 namespace detectron2 {
 
-#ifdef WITH_CUDA
+#if defined (WITH_CUDA) || defined (WITH_HIP)
 extern int get_cudart_version();
 #endif
 

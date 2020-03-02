@@ -89,3 +89,6 @@ class RetinaNetE2ETest(ModelE2ETest):
         instances = [get_empty_instance(200, 250), get_empty_instance(200, 249)]
         self._test_eval([(200, 250), (200, 249)])
         self._test_train([(200, 250), (200, 249)], instances)
+
+if __name__ == "__main__":
+    unittest.main()

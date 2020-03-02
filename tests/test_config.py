@@ -56,3 +56,6 @@ class TestConfigVersioning(unittest.TestCase):
         latest_ver = cfg.VERSION
         self._merge_cfg_str(cfg, _V1_CFG)
         self.assertEqual(cfg.VERSION, latest_ver)
+
+if __name__ == "__main__":
+    unittest.main()
