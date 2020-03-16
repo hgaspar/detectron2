@@ -8,7 +8,7 @@ from os import path
 from setuptools import find_packages, setup
 from typing import List
 import torch
-from torch.utils.cpp_extension import CUDA_HOME, ROCM_HOME, CppExtension, CUDAExtension
+from torch.utils.cpp_extension import CUDA_HOME, CppExtension, CUDAExtension
 from torch.utils.hipify import hipify_python
 
 torch_ver = [int(x) for x in torch.__version__.split(".")[:2]]
@@ -21,9 +21,10 @@ def get_version():
     version_line = [l.strip() for l in init_py if l.startswith("__version__")][0]
     version = version_line.split("=")[-1].strip().strip("'\"")
 
-    # Used by CI to build nightly packages. Users should never use it.
-    # To build a nightly wheel, run:
-    # FORCE_CUDA=1 BUILD_NIGHTLY=1 TORCH_CUDA_ARCH_LIST=All python setup.py bdist_wheel
+    # The following is used to build release packages.
+    # Users should never use it.
+    suffix = os.getenv("D2_VERSION_SUFFIX", "")
+    version = version + suffix
     if os.getenv("BUILD_NIGHTLY", "0") == "1":
         from datetime import datetime
 
@@ -44,7 +45,14 @@ def get_extensions():
     main_source = path.join(extensions_dir, "vision.cpp")
     sources = glob.glob(path.join(extensions_dir, "**", "*.cpp"))
 
-    is_rocm_pytorch = os.path.exists(ROCM_HOME)
+    print("ORIGINAL SOURCES")
+    print(sources)
+    print("\n\n")
+
+    is_rocm_pytorch = False
+    if torch.__version__ >= '1.5':
+        from torch.utils.cpp_extension import ROCM_HOME
+        is_rocm_pytorch = True if ((torch.version.hip is not None) and (ROCM_HOME is not None)) else False
 
     if is_rocm_pytorch:
         print("ROCM!")
@@ -54,7 +62,6 @@ def get_extensions():
             includes="/detectron2/layers/csrc/*",
             show_detailed=True,
             is_pytorch_extension=True)
-
 
         source_cuda = glob.glob(path.join(extensions_dir, "**", 'hip', "*.hip")) + glob.glob(
             path.join(extensions_dir, 'hip', "*.hip"))
@@ -69,22 +76,18 @@ def get_extensions():
         source_cuda = glob.glob(path.join(extensions_dir, "**", "*.cu")) + glob.glob(
             path.join(extensions_dir, "*.cu"))
 
-    source_real_cuda = glob.glob(path.join(extensions_dir, "**", "*.cu")) + glob.glob(
-            path.join(extensions_dir, "*.cu"))
-
-    print("Original cuda source: ", source_real_cuda)
-
     sources = [main_source] + sources
     extension = CppExtension
 
     extra_compile_args = {"cxx": []}
     define_macros = []
 
-    if (torch.cuda.is_available() and CUDA_HOME is not None) or os.getenv("FORCE_CUDA", "0") == "1":
+    if (torch.cuda.is_available() and ((CUDA_HOME is not None)  or is_rocm_pytorch)) or os.getenv('FORCE_CUDA', '0') == '1':
         extension = CUDAExtension
         sources += source_cuda
 
         if not is_rocm_pytorch:
+            print("NOT --------ROCM!")
             define_macros += [("WITH_CUDA", None)]
             extra_compile_args["nvcc"] = [
                 "-DCUDA_HAS_FP16=1",
@@ -93,6 +96,7 @@ def get_extensions():
                 "-D__CUDA_NO_HALF2_OPERATORS__",
             ]
         else:
+            print("ROCM!")
             define_macros += [("WITH_HIP", None)]
             extra_compile_args["nvcc"] = []
 
@@ -100,6 +104,13 @@ def get_extensions():
         CC = os.environ.get("CC", None)
         if CC is not None:
             extra_compile_args["nvcc"].append("-ccbin={}".format(CC))
+
+    else:
+        print("SSSSOOOOOOSSSSSS")
+
+    sources = [os.path.join(extensions_dir, s) for s in sources]
+    print("Modified sources!")
+    print (sources)
 
     include_dirs = [extensions_dir]
 
@@ -128,18 +139,20 @@ def get_model_zoo_configs() -> List[str]:
         path.dirname(path.realpath(__file__)), "detectron2", "model_zoo", "configs"
     )
     # Symlink the config directory inside package to have a cleaner pip install.
-    if path.exists(destination):
-        # Remove stale symlink/directory from a previous build.
+
+    # Remove stale symlink/directory from a previous build.
+    if path.exists(source_configs_dir):
         if path.islink(destination):
             os.unlink(destination)
-        else:
+        elif path.isdir(destination):
             shutil.rmtree(destination)
 
-    try:
-        os.symlink(source_configs_dir, destination)
-    except OSError:
-        # Fall back to copying if symlink fails: ex. on Windows.
-        shutil.copytree(source_configs_dir, destination)
+    if not path.exists(destination):
+        try:
+            os.symlink(source_configs_dir, destination)
+        except OSError:
+            # Fall back to copying if symlink fails: ex. on Windows.
+            shutil.copytree(source_configs_dir, destination)
 
     config_paths = glob.glob("configs/**/*.yaml", recursive=True)
     return config_paths
@@ -157,7 +170,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "termcolor>=1.1",
-        "Pillow==6.2.2",  # torchvision currently does not work with Pillow 7
+        "Pillow",  # you can also use pillow-simd for better performance
         "yacs>=0.1.6",
         "tabulate",
         "cloudpickle",
