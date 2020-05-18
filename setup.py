@@ -54,17 +54,13 @@ def get_extensions():
         hipify_python.hipify(
             project_directory=this_dir,
             output_directory=this_dir,
-            includes="/detectron2/layers/csrc/*",
+            includes=("/detectron2/layers/csrc/*", "/detectron2/layers/csrc/box_iou_rotated", "detectron2/layers/cscr/deformable"),
             show_detailed=True,
             is_pytorch_extension=True)
 
         source_cuda = glob.glob(path.join(extensions_dir, "**", 'hip', "*.hip")) + glob.glob(
             path.join(extensions_dir, 'hip', "*.hip"))
 
-        shutil.copy("detectron2/layers/csrc/box_iou_rotated/box_iou_rotated_utils.h", 
-                    "detectron2/layers/csrc/box_iou_rotated/hip/box_iou_rotated_utils.h")
-        shutil.copy("detectron2/layers/csrc/deformable/deform_conv.h", 
-                    "detectron2/layers/csrc/deformable/hip/deform_conv.h")
 
     else:
         source_cuda = glob.glob(path.join(extensions_dir, "**", "*.cu")) + glob.glob(
