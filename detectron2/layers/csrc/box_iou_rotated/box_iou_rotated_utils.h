@@ -192,7 +192,7 @@ HOST_DEVICE_INLINE int convex_hull_graham(
   // (essentially sorting according to angles)
   // If the angles are the same, sort according to their distance to origin
   T dist[24];
-#ifdef __CUDACC__ || __HIP__==1 || __HCC__==1
+#ifdef __CUDACC__ || __HCC__==1 || __HIP__==1
   // compute distance to origin before sort, and sort them together with the
   // points
   for (int i = 0; i < num_in; i++) {
