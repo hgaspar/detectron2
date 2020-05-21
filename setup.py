@@ -46,7 +46,7 @@ def get_extensions():
     sources = glob.glob(path.join(extensions_dir, "**", "*.cpp"))
 
     is_rocm_pytorch = False
-    if torch.__version__ >= '1.5':
+    if torch_ver >= [1, 5]:
         from torch.utils.cpp_extension import ROCM_HOME
         is_rocm_pytorch = True if ((torch.version.hip is not None) and (ROCM_HOME is not None)) else False
 
@@ -58,6 +58,12 @@ def get_extensions():
             show_detailed=True,
             is_pytorch_extension=True)
 
+        # Current version of hipify function in pytorch creates an intermediate directory
+        # named "hip" at the same level of the path hierarchy if a "cuda" directory exists,
+        # or modifying the hierarchy, if it doesn't. Once pytorch supports 
+        # "same directory" hipification (PR pendeing), the source_cuda will be set
+        # similarly in both cuda and hip paths, and the explicit header file copy
+        # (below) will not be needed.
         source_cuda = glob.glob(path.join(extensions_dir, "**", 'hip', "*.hip")) + glob.glob(
             path.join(extensions_dir, 'hip', "*.hip"))
 
