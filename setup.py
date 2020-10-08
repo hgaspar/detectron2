@@ -53,7 +53,9 @@ def get_extensions():
             True if ((torch.version.hip is not None) and (ROCM_HOME is not None)) else False
         )
 
-    if is_rocm_pytorch:
+    hipify_ver = [int(x) for x in torch.utils.hipify.__version__.split(".")] if hasattr(torch.utils.hipify, "__version__") else [0,0,0]
+
+    if is_rocm_pytorch and hipify_ver < [1,0,0]:
         hipify_python.hipify(
             project_directory=this_dir,
             output_directory=this_dir,
@@ -81,17 +83,20 @@ def get_extensions():
             "detectron2/layers/csrc/deformable/hip/deform_conv.h",
         )
 
+        sources = [main_source] + sources
+        sources = [
+            s
+            for s in sources
+            if not is_rocm_pytorch or torch_ver < [1, 7] or not s.endswith("hip/vision.cpp")
+        ]
+    
     else:
         source_cuda = glob.glob(path.join(extensions_dir, "**", "*.cu")) + glob.glob(
             path.join(extensions_dir, "*.cu")
         )
 
-    sources = [main_source] + sources
-    sources = [
-        s
-        for s in sources
-        if not is_rocm_pytorch or torch_ver < [1, 7] or not s.endswith("hip/vision.cpp")
-    ]
+        sources = [main_source] + sources
+    
 
     extension = CppExtension
 
